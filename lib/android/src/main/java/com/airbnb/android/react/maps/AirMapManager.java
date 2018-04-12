@@ -20,6 +20,7 @@ import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
+import com.google.maps.android.data.kml.KmlLayer;
 
 
 import java.util.Map;
@@ -190,6 +191,11 @@ public class AirMapManager extends ViewGroupManager<AirMapView> {
     view.map.getUiSettings().setZoomGesturesEnabled(zoomEnabled);
   }
 
+  @ReactProp(name = "zoomControlEnabled", defaultBoolean = true)
+  public void setZoomControlEnabled(AirMapView view, boolean zoomControlEnabled) {
+    view.map.getUiSettings().setZoomControlsEnabled(zoomControlEnabled);
+  }
+
   @ReactProp(name = "rotateEnabled", defaultBoolean = false)
   public void setRotateEnabled(AirMapView view, boolean rotateEnabled) {
     view.map.getUiSettings().setRotateGesturesEnabled(rotateEnabled);
@@ -233,6 +239,13 @@ public class AirMapManager extends ViewGroupManager<AirMapView> {
   @ReactProp(name = "maxZoomLevel")
   public void setMaxZoomLevel(AirMapView view, float maxZoomLevel) {
     view.map.setMaxZoomPreference(maxZoomLevel);
+  }
+
+  @ReactProp(name = "kmlSrc")
+  public void setKmlSrc(AirMapView view, String kmlUrl) {
+    if (kmlUrl != null) {
+      view.setKmlSrc(kmlUrl);
+    }
   }
 
   @Override
@@ -313,10 +326,13 @@ public class AirMapManager extends ViewGroupManager<AirMapView> {
     );
 
     map.putAll(MapBuilder.of(
+        "onUserLocationChange", MapBuilder.of("registrationName", "onUserLocationChange"),
         "onMarkerDragStart", MapBuilder.of("registrationName", "onMarkerDragStart"),
         "onMarkerDrag", MapBuilder.of("registrationName", "onMarkerDrag"),
         "onMarkerDragEnd", MapBuilder.of("registrationName", "onMarkerDragEnd"),
-        "onPanDrag", MapBuilder.of("registrationName", "onPanDrag")
+        "onPanDrag", MapBuilder.of("registrationName", "onPanDrag"),
+        "onKmlReady", MapBuilder.of("registrationName", "onKmlReady"),
+        "onPoiClick", MapBuilder.of("registrationName", "onPoiClick")
     ));
 
     return map;
