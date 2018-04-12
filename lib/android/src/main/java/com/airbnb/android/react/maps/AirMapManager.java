@@ -16,9 +16,11 @@ import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.events.RCTEventEmitter;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMapOptions;
+import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MapStyleOptions;
+
 
 import java.util.Map;
 
@@ -61,6 +63,13 @@ public class AirMapManager extends ViewGroupManager<AirMapView> {
 
   @Override
   protected AirMapView createViewInstance(ThemedReactContext context) {
+    try {
+      MapsInitializer.initialize(this.appContext);
+    } catch (RuntimeException e) {
+      e.printStackTrace();
+      emitMapError(context, "Map initialize error", "map_init_error");
+    }
+
     return new AirMapView(context, this.appContext, this, googleMapOptions);
   }
 
