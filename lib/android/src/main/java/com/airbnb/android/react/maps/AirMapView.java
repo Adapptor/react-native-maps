@@ -7,6 +7,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.os.Build;
 import android.support.v4.view.GestureDetectorCompat;
 import android.support.v4.view.MotionEventCompat;
@@ -29,6 +30,7 @@ import com.facebook.react.bridge.WritableNativeArray;
 import com.facebook.react.bridge.WritableNativeMap;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIManagerModule;
+import com.facebook.react.uimanager.ViewProps;
 import com.facebook.react.uimanager.events.EventDispatcher;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -100,6 +102,8 @@ public class AirMapView extends MapView implements GoogleMap.InfoWindowAdapter,
   private final ThemedReactContext context;
   private final EventDispatcher eventDispatcher;
 
+  private ViewAttacherGroup attacherGroup;
+
   private static boolean contextHasBug(Context context) {
     return context == null ||
         context.getResources() == null ||
@@ -169,6 +173,24 @@ public class AirMapView extends MapView implements GoogleMap.InfoWindowAdapter,
     });
 
     eventDispatcher = reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher();
+
+    // Set up a parent view for triggering visibility in subviews that depend on it.
+    // Mainly ReactImageView depends on Fresco which depends on onVisibilityChanged() event
+    attacherGroup = new ViewAttacherGroup(context);
+    LayoutParams attacherLayoutParams = new LayoutParams(0, 0);
+    attacherLayoutParams.width = 0;
+    attacherLayoutParams.height = 0;
+    attacherLayoutParams.leftMargin = 99999999;
+    attacherLayoutParams.topMargin = 99999999;
+    attacherGroup.setLayoutParams(attacherLayoutParams);
+    attacherGroup.setVisibility(VISIBLE);
+    attacherGroup.setAlpha(0.0f);
+    attacherGroup.setRemoveClippedSubviews(false);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+      attacherGroup.setClipBounds(new Rect(0, 0, 0, 0));
+    }
+    attacherGroup.setOverflow("hidden");
+    addView(attacherGroup);
   }
 
   @Override
@@ -194,11 +216,12 @@ public class AirMapView extends MapView implements GoogleMap.InfoWindowAdapter,
         coordinate.putDouble("latitude", location.getLatitude());
         coordinate.putDouble("longitude", location.getLongitude());
         coordinate.putDouble("altitude", location.getAltitude());
+        coordinate.putDouble("timestamp", location.getTime());
         coordinate.putDouble("accuracy", location.getAccuracy());
         coordinate.putDouble("speed", location.getSpeed());
         if(android.os.Build.VERSION.SDK_INT >= 18){
         coordinate.putBoolean("isFromMockProvider", location.isFromMockProvider());
-        }         
+        }
 
         event.putMap("coordinate", coordinate);
 
@@ -438,13 +461,13 @@ public class AirMapView extends MapView implements GoogleMap.InfoWindowAdapter,
   }
 
   public void setShowsMyLocationButton(boolean showMyLocationButton) {
-    if (hasPermissions()) {
+    if (hasPermissions() || !showMyLocationButton) {
       map.getUiSettings().setMyLocationButtonEnabled(showMyLocationButton);
     }
   }
 
   public void setToolbarEnabled(boolean toolbarEnabled) {
-    if (hasPermissions()) {
+    if (hasPermissions() || !toolbarEnabled) {
       map.getUiSettings().setMapToolbarEnabled(toolbarEnabled);
     }
   }
@@ -516,6 +539,12 @@ public class AirMapView extends MapView implements GoogleMap.InfoWindowAdapter,
       AirMapMarker annotation = (AirMapMarker) child;
       annotation.addToMap(map);
       features.add(index, annotation);
+
+      int visibility = annotation.getVisibility();
+      annotation.setVisibility(INVISIBLE);
+      attacherGroup.addView(annotation);
+      annotation.setVisibility(visibility);
+
       Marker marker = (Marker) annotation.getFeature();
       markerMap.put(marker, annotation);
     } else if (child instanceof AirMapPolyline) {
@@ -609,6 +638,16 @@ public class AirMapView extends MapView implements GoogleMap.InfoWindowAdapter,
 
       boundsToMove = null;
     }
+  }
+
+  public void animateToNavigation(LatLng location, float bearing, float angle, int duration) {
+    if (map == null) return;
+    CameraPosition cameraPosition = new CameraPosition.Builder(map.getCameraPosition())
+        .bearing(bearing)
+        .tilt(angle)
+        .target(location)
+        .build();
+    map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition), duration, null);
   }
 
   public void animateToRegion(LatLngBounds bounds, int duration) {
